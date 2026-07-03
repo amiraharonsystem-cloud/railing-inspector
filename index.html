@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>הזנת נתונים לאקסל</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; padding-top: 50px; background: #f4f4f4; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 300px; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #28a745; color: white; border: none; cursor: pointer; }
+        button:hover { background: #218838; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h3>הוספת שורה לאקסל</h3>
+        <input type="text" id="name" placeholder="שם מלא">
+        <input type="email" id="email" placeholder="אימייל">
+        <input type="text" id="phone" placeholder="טלפון">
+        <button onclick="sendData()">שמור באקסל מקומי</button>
+        <p id="msg"></p>
+    </div>
+
+    <script>
+        async function sendData() {
+            const data = {
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value
+            };
+
+            const response = await fetch('/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+            document.getElementById('msg').innerText = result.message;
+            if(response.ok) {
+                document.querySelectorAll('input').forEach(i => i.value = '');
+            }
+        }
+    </script>
+</body>
+</html>
