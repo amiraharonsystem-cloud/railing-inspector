@@ -79,11 +79,10 @@ notes = st.text_area("הערות נוספות וממצאים מיוחדים:")
 if st.button("שמור דוח בדיקה"):
     if customer_name and order_number:
         
-        # הגדרת נתיב מוחלט ומדויק ישירות לתוך תיקיית ה-OneDrive של המערכת
-        BASE_ONEDRIVE_PATH = r"C:\Users\amir\OneDrive - System Labs\שולחן העבודה\proj"
-        IMAGE_FOLDER_PATH = os.path.join(BASE_ONEDRIVE_PATH, "uploaded_images")
+        # שימוש בנתיב יחסי חכם - יוצר את התיקייה ישירות בתוך תיקיית הפרויקט המקומית שמסונכרנת ל-OneDrive/SharePoint
+        IMAGE_FOLDER_PATH = "uploaded_images"
         
-        # יצירת התיקייה הראשית ב-OneDrive אם היא לא קיימת
+        # יצירת התיקייה הראשית אם היא לא קיימת
         if not os.path.exists(IMAGE_FOLDER_PATH):
             os.makedirs(IMAGE_FOLDER_PATH)
             
@@ -94,15 +93,15 @@ if st.button("שמור דוח בדיקה"):
         if not os.path.exists(CUSTOMER_DIR):
             os.makedirs(CUSTOMER_DIR)
             
-        # שמירת הקבצים פיזית לתיקייה החדשה ב-OneDrive
+        # שמירת הקבצים פיזית לתיקייה החדשה
         if uploaded_files:
             for file in uploaded_files:
                 file_path = os.path.join(CUSTOMER_DIR, file.name)
                 with open(file_path, "wb") as f:
                     f.write(file.getbuffer())
-            st.success(f"📂 נוצרה תיקייה והתמונות נשמרו ב-OneDrive בנתיב: {CUSTOMER_DIR}")
+            st.success(f"📂 נוצרה תיקייה והתמונות נשמרו בהצלחה בנתיב: {CUSTOMER_DIR}")
         else:
-            st.info(f"📂 נוצרה תיקיית דוח ריקה ב-OneDrive בנתיב: {CUSTOMER_DIR}")
+            st.info(f"📂 נוצרה תיקיית דוח ריקה בנתיב: {CUSTOMER_DIR}")
         
         st.balloons()
         st.success(f"הדוח עבור הזמנה {order_number} נשמר בהצלחה!")
