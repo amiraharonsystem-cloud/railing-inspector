@@ -1,6 +1,5 @@
 import streamlit as st  # type: ignore[import]
 import os
-import zipfile
 from datetime import datetime
 
 # 1. הגדרת תצורת עמוד
@@ -10,7 +9,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. הזרקת CSS להתאמת כיווניות מימין לשמאל (RTL)
+# 2. הזרקת CSS להתאמת כיווניות מימין לשמאל (RTL) ותצוגה נקייה
 st.markdown("""
     <style>
     body, .stApp, p, li, h1, h2, h3, h4, h5, div, label {
@@ -32,7 +31,7 @@ st.title("מערכת בדיקת מעקות - ת ק 1142")
 st.write(f"תאריך עדכון המערכת: {datetime.now().strftime('%d/%m/%Y')}")
 st.divider()
 
-# 4. פרטי הלקוח
+# 4. פרטי הלקוח וזיהוי ההזמנה
 st.header("1. פרטי הלקוח וזיהוי ההזמנה")
 
 col1, col2 = st.columns(2)
@@ -80,27 +79,32 @@ notes = st.text_area("הערות נוספות וממצאים מיוחדים:")
 if st.button("שמור דוח בדיקה"):
     if customer_name and order_number:
         
-        # לוגיקה משודרגת: יצירת תיקייה ייעודית וספציפית להזמנה זו
+        # הגדרת נתיב מוחלט ומדויק ישירות לתוך תיקיית ה-OneDrive של המערכת
+        BASE_ONEDRIVE_PATH = r"C:\Users\amir\OneDrive - System Labs\שולחן העבודה\proj"
+        IMAGE_FOLDER_PATH = os.path.join(BASE_ONEDRIVE_PATH, "uploaded_images")
+        
+        # יצירת התיקייה הראשית ב-OneDrive אם היא לא קיימת
+        if not os.path.exists(IMAGE_FOLDER_PATH):
+            os.makedirs(IMAGE_FOLDER_PATH)
+            
+        # יצירת תיקייה ספציפית ללקוח הנוכחי
+        customer_folder_name = f"{customer_name}_דוח_{order_number}"
+        CUSTOMER_DIR = os.path.join(IMAGE_FOLDER_PATH, customer_folder_name)
+        
+        if not os.path.exists(CUSTOMER_DIR):
+            os.makedirs(CUSTOMER_DIR)
+            
+        # שמירת הקבצים פיזית לתיקייה החדשה ב-OneDrive
         if uploaded_files:
-            # ניקוי רווחים או תווים בעייתיים משם הלקוח בשביל יצירת תיקייה תקינה
-            folder_name = f"{customer_name}_דוח_{order_number}"
-            
-            # הגדרת נתיב התיקייה החדשה
-            CUSTOMER_DIR = os.path.join("uploaded_images", folder_name)
-            
-            # יצירת התיקייה הספציפית של הלקוח אם היא לא קיימת עדיין
-            if not os.path.exists(CUSTOMER_DIR):
-                os.makedirs(CUSTOMER_DIR)
-                
-            # שמירת כל התמונות ישירות לתוך התיקייה החדשה שנפתחה
             for file in uploaded_files:
                 file_path = os.path.join(CUSTOMER_DIR, file.name)
                 with open(file_path, "wb") as f:
                     f.write(file.getbuffer())
-            
-            st.success(f"📂 נוצרה תיקייה חדשה והתמונות נשמרו בנתיב: {CUSTOMER_DIR}")
+            st.success(f"📂 נוצרה תיקייה והתמונות נשמרו ב-OneDrive בנתיב: {CUSTOMER_DIR}")
+        else:
+            st.info(f"📂 נוצרה תיקיית דוח ריקה ב-OneDrive בנתיב: {CUSTOMER_DIR}")
         
         st.balloons()
-        st.success(f"הדוח עבור הזמנה {order_number} נשמר בהצלחה במערכת!")
+        st.success(f"הדוח עבור הזמנה {order_number} נשמר בהצלחה!")
     else:
-        st.warning("אנא מלא שם לקוח ומספר הזמנה לפני השמירה כדי שנוכל לייצר את התיקייה עבורך.")
+        st.warning("אנא מלא שם לקוח ומספר הזמנה לפני השמירה.")
