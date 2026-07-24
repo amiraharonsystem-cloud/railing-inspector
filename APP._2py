@@ -1,0 +1,197 @@
+import streamlit as st
+import io
+import os
+from datetime import datetime
+from openpyxl import load_workbook, Workbook
+from openpyxl.drawing.image import Image as OpenpyxlImage
+from PIL import Image as PILImage
+
+# 1. הגדרת תצורת עמוד ראשונית - layout="centered" מותאם מצוין לניידים
+st.set_page_config(
+    page_title="מערכת בדיקת מעקות",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
+
+# 2. הזרקת CSS מותאם לניידים (Responsive RTL) - ללא display:none שחוסם דפדפנים בנייד
+st.markdown("""
+    <style>
+    /* אילוץ כיווניות כללית של כל האפליקציה מימין לשמאל */
+    .stApp, div[data-testid="stAppViewContainer"], .main {
+        direction: RTL !important;
+        text-align: right !important;
+    }
+    
+    /* יישור כל סוגי הכותרות, הפסקאות והתוויות */
+    h1, h2, h3, h4, h5, h6, p, span, label, li, ul {
+        direction: RTL !important;
+        text-align: right !important;
+    }
+    
+    /* תיקון יישור עבור שדות קלט ומספרים */
+    input, textarea, select, div[data-testid="stNumberInput"] input {
+        direction: RTL !important;
+        text-align: right !important;
+    }
+    
+    /* הצמדת כפתורים לצד ימין */
+    div[element-type="button"], button, .stButton, .stDownloadButton {
+        direction: RTL !important;
+        text-align: right !important;
+        width: 100% !important; /* כפתורים רחבים ונוחים ללחיצה בנייד */
+    }
+    
+    /* יישור מוחלט של תיבות הודעות סטטוס */
+    div[data-testid="stAlert"], .stAlert, div[data-testid="stNotification"] {
+        direction: RTL !important;
+        text-align: right !important;
+    }
+
+    /* עיצוב רכיב העלאת הקבצים מבלי לחסום את תפקודו בנייד */
+    .stFileUploader section {
+        direction: RTL !important;
+        text-align: right !important;
+        padding: 15px !important;
+    }
+    
+    /* במקום להעלים לחלוטין ולחסום, אנחנו רק מנקים צבעי שגיאה ומרווחים כפולים */
+    div[data-testid="stFileUploaderFilesContainer"] {
+        direction: RTL !important;
+        background-color: transparent !important;
+        border: none !important;
+    }
+    
+    div[data-testid="stCaptionContainer"] {
+        direction: RTL !important;
+        text-align: right !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# 3. כותרת האפליקציה
+st.title("מערכת הפקת דוחות בדיקת מעקות")
+st.write(f"תאריך הפעלה: {datetime.now().strftime('%d/%m/%Y')}")
+st.divider()
+
+# 4. פרטי הבדיקה בהתאם למבנה קובץ התבנית הארגונית
+st.header("1. פרטי הלקוח וזיהוי ההזמנה")
+
+# שימוש בשדות בודדים ללא columns צפופים כדי שייראה מעולה במסך הנייד האנכי
+customer_name = st.text_input("שם המזמין / הלקוח:")
+project_site = st.text_input("שם האתר / כתובת האתר:")
+project_code = st.text_input("קוד פרויקט:")
+inspector_name = st.text_input("שם נציג המזמין בבדיקה / בודק:")
+
+st.divider()
+
+# 5. רכיב ניהול המדיה ותצוגת התמונות בשטח
+st.header("2. תיעוד גרפי ותמונות מהשטח")
+uploaded_files = st.file_uploader("בחר או צלם תמונות של המעקה/הליקויים:", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
+
+if uploaded_files:
+    st.success(f"📸 נקלטו {len(uploaded_files)} תמונות במערכת.")
+    # בנייד נציג אותן אחת מתחת לשנייה (ולא ב-3 עמודות צפופות) כדי למנוע עיוות במסך קטן
+    for index, file in enumerate(uploaded_files):
+        caption_tag = "לפני עומס" if index == 0 else "במהלך עומס" if index == 1 else f"תמונה {index + 1}"
+        st.image(file, caption=caption_tag, use_column_width=True)
+
+st.divider()
+notes = st.text_area("הערות נוספות וממצאים מיוחדים מהשטח:")
+
+# משתנה זמני ב-Session State לשמירת קובץ ה-Excel המופק
+if 'excel_generated_data' not in st.session_state:
+    st.session_state['excel_generated_data'] = None
+
+# 6. מנגנון עיבוד והזרקה מוגן שגיאות ומותאם לתבנית שלכם
+st.divider()
+if st.button("שמור דוח בדיקה והפק אקסל"):
+    if not customer_name or not project_code:
+        st.warning("⚠️ אנא מלא שם מזמין וקוד פרויקט כדי שנוכל לייצר את הדוח.")
+    elif len(uploaded_files) < 2:
+        st.error("❌ חסימת ולידציה: לא ניתן להפיק תעודה סופית ללא העלאת 2 תמונות לפחות (לפני עומס ובמהלך עומס).")
+    else:
+        with st.spinner("מעבד את התבנית, מזריק נתונים ומציב מדיה בסוף המסמך..."):
+            try:
+                template_path = "template_format.xlsx" 
+                
+                # טעינת התבנית או יצירת גיבוי אוטומטי למניעת קריסות
+                if os.path.exists(template_path):
+                    wb = load_workbook(template_path, data_only=False)
+                    ws = wb.active
+                    st.info("ℹ️ נמצא קובץ תבנית ארגוני קיים (`.xlsx`) - הנתונים מוזרקים לשדות המתאימים.")
+                else:
+                    wb = Workbook()
+                    ws = wb.active
+                    ws.title = "תעודת בדיקה"
+                    st.warning("⚠️ קובץ התבנית 'template_format.xlsx' לא נמצא. נוצר מבנה זמני חדש.")
+                
+                # הזרקת הנתונים הבסיסיים לפי מיפויי התאים בקובץ שלכם
+                try:
+                    ws["K3"] = datetime.now().strftime('%d/%m/%Y')  # תאריך בדיקה
+                    ws["D4"] = project_site                          # שם האתר
+                    ws["K4"] = project_code                          # קוד פרויקט
+                    ws["B7"] = customer_name                         # שם המזמין
+                    ws["I7"] = inspector_name                        # נציג המזמין
+                    ws["D3"] = "1"                                   # עמוד מס'
+                except Exception as cell_err:
+                    st.warning(f"התראה: חלק מהתאים המובנים לא נמצאו במבנה הקיים. ({str(cell_err)})")
+                
+                # איתור דינמי ומוגן של השורה האחרונה האמיתית בקובץ
+                max_row = 35  
+                for row in range(1, 250):
+                    for col in range(1, 15):
+                        try:
+                            if ws.cell(row=row, column=col).value is not None:
+                                if row > max_row:
+                                    max_row = row
+                        except Exception:
+                            continue
+                
+                # הגדרת מיקום ההתחלה החדש
+                start_row = max_row + 4
+                
+                # כתיבת הערות מהשטח בסוף המסמך
+                ws.cell(row=start_row, column=1, value="3. הערות נוספות וממצאים מיוחדים מהשטח:")
+                ws.cell(row=start_row + 1, column=1, value=notes)
+                
+                # מעבר לבלוק נספח התמונות
+                start_row = start_row + 4
+                ws.cell(row=start_row, column=1, value="4. נספח תיעוד חזותי (צילומי בדיקה ועומסים):")
+                start_row += 2
+                
+                # שמירה והטמעה של המדיה פיזית בתוך גיליון האקסל
+                for idx, file in enumerate(uploaded_files):
+                    pil_img = PILImage.open(file)
+                    pil_img.thumbnail((320, 320))  
+                    
+                    img_byte_arr = io.BytesIO()
+                    pil_img.save(img_byte_arr, format='PNG')
+                    img_byte_arr.seek(0)
+                    
+                    xl_img = OpenpyxlImage(img_byte_arr)
+                    ws.add_image(xl_img, f"B{start_row}")
+                    
+                    tag_text = "לפני_העמסה" if idx == 0 else "במהלך_העמסה" if idx == 1 else f"תמונה_{idx + 1}"
+                    ws[f"A{start_row}"] = f"{tag_text}:"
+                    
+                    start_row += 18 
+                
+                # שמירת קובץ האקסל המוגמר ישירות לזיכרון ה-RAM
+                excel_data = io.BytesIO()
+                wb.save(excel_data)
+                excel_data.seek(0)
+                
+                st.session_state['excel_generated_data'] = excel_data.getvalue()
+                st.success("✅ הדוח והתמונות עובדו בהצלחה והוטמעו בסוף קובץ הטמפלייט!")
+                
+            except Exception as e:
+                st.error(f"התרחשה שגיאה במהלך עיבוד הדוח: {str(e)}")
+
+# כפתור הורדה יציב המופיע מיד בסיום ההפקה
+if st.session_state['excel_generated_data'] is not None:
+    st.download_button(
+        label="📥 הורד קובץ Excel מוגמר",
+        data=st.session_state['excel_generated_data'],
+        file_name=f"דוח_בדיקה_{project_code if project_code else 'מעקות'}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
